@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live Crypto Price Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f8f9fa;
+      margin: 0;
+      padding: 20px;
+      color: #333;
+    }
+
+    .dashboard {
+      max-width: 900px;
+      margin: 0 auto;
+      background: white;
+      padding: 25px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+
+    h1 {
+      color: #2c3e50;
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #7f8c8d;
+      margin-bottom: 5px;
+    }
+
+    .instruction {
+      text-align: center;
+      color: #6200ea;
+      font-weight: 600;
+      margin-bottom: 25px;
+      font-size: 18px;
+      padding: 10px;
+      background: #f3e5ff;
+      border-radius: 8px;
+    }
+
+    .chart-container {
+      margin: 30px 0;
+      height: 400px;
+    }
+
+    .crypto-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 12px;
+      margin-bottom: 25px;
+    }
+
+    .crypto-btn {
+      padding: 12px 8px;
+      background: #6200ea;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.2s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .crypto-btn:hover {
+      background: #3700b3;
+      transform: translateY(-2px);
+    }
+
+    .crypto-btn.active {
+      background: #00c853;
+      box-shadow: 0 4px 8px rgba(0, 200, 83, 0.3);
+    }
+
+    .crypto-name {
+      font-size: 14px;
+    }
+
+    .crypto-symbol {
+      font-size: 12px;
+      opacity: 0.8;
+    }
+
+    .price-display {
+      background: #f1f3f4;
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 20px;
+      text-align: center;
+    }
+
+    .current-price {
+      font-size: 24px;
+      font-weight: bold;
+      color: #2e7d32;
+    }
+
+    .footer {
+      text-align: center;
+      color: #95a5a6;
+      font-size: 14px;
+      margin-top: 30px;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 20px;
+      color: #6200ea;
+    }
+
+    @media (max-width: 600px) {
+      .crypto-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+      .instruction {
+        font-size: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard">
+    <h1>📊 Live Crypto Tracker</h1>
+    <p class="subtitle">Real-time prices from CoinGecko API</p>
+    <div class="instruction">🔍 Select any cryptocurrency below to view its price history</div>
+    
+    <div class="crypto-grid">
+      <button class="crypto-btn active" onclick="fetchData('bitcoin')">
+        <span class="crypto-name">Bitcoin</span>
+        <span class="crypto-symbol">BTC</span>
+      </button>
+      <button class="crypto-btn" onclick="fetchData('ethereum')">
+        <span class="crypto-name">Ethereum</span>
+        <span class="crypto-symbol">ETH</span>
+      </button>
+      <button class="crypto-btn" onclick="fetchData('binancecoin')">
+        <span class="crypto-name">Binance</span>
+        <span class="crypto-symbol">BNB</span>
+      </button>
+      <button class="crypto-btn" onclick="fetchData('ripple')">
+        <span class="crypto-name">XRP</span>
+        <span class="crypto-symbol">XRP</span>
+      </button>
+      <button class="crypto-btn" onclick="fetchData('solana')">
+        <span class="crypto-name">Solana</span>
+        <span class="crypto-symbol">SOL</span>
+      </button>
+      <button class="crypto-btn" onclick="fetchData('cardano')">
+        <span class="crypto-name">Cardano</span>
+        <span class="crypto-symbol">ADA</span>
+      </button>
+      <button class="crypto-btn" onclick="fetchData('dogecoin')">
+        <span class="crypto-name">Dogecoin</span>
+        <span class="crypto-symbol">DOGE</span>
+      </button>
+      <button class="crypto-btn" onclick="fetchData('polkadot')">
+        <span class="crypto-name">Polkadot</span>
+        <span class="crypto-symbol">DOT</span>
+      </button>
+    </div>
+
+    <div class="price-display">
+      <div>Current Price</div>
+      <div class="current-price" id="currentPrice">$--.--</div>
+    </div>
+
+    <div class="chart-container">
+      <canvas id="priceChart"></canvas>
+    </div>
+
+    <p class="footer">Data provided by <a href="https://www.coingecko.com" target="_blank">CoinGecko API</a></p>
+    <p class="footer">Last updated: <span id="lastUpdated">--:--:--</span></p>
+  </div>
+
+  <script>
+    // Global variables
+    let chart;
+    const apiUrl = "https://api.coingecko.com/api/v3";
+    const cryptoIds = {
+      bitcoin: 'BTC',
+      ethereum: 'ETH',
+      binancecoin: 'BNB',
+      ripple: 'XRP',
+      solana: 'SOL',
+      cardano: 'ADA',
+      dogecoin: 'DOGE',
+      polkadot: 'DOT'
+    };
+
+    // Initialize chart
+    function initChart() {
+      const ctx = document.getElementById('priceChart').getContext('2d');
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [{
+            label: 'Price (USD)',
+            data: [],
+            borderColor: '#6200ea',
+            backgroundColor: 'rgba(98, 0, 234, 0.1)',
+            borderWidth: 2,
+            tension: 0.1,
+            fill: true
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: {
+              display: true,
+              text: '7-Day Price History',
+              font: {
+                size: 16
+              }
+            },
+            tooltip: {
+              mode: 'index',
+              intersect: false,
+              callbacks: {
+                label: function(context) {
+                  return `${context.dataset.label}: $${context.parsed.y.toFixed(2)}`;
+                }
+              }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: false,
+              ticks: {
+                callback: function(value) {
+                  return '$' + value.toFixed(2);
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // Fetch data from CoinGecko API
+    async function fetchData(cryptoId) {
+      try {
+        // Update active button
+        document.querySelectorAll('.crypto-btn').forEach(btn => {
+          btn.classList.remove('active');
+        });
+        event.target.classList.add('active');
+
+        // Show loading state
+        document.getElementById('currentPrice').textContent = 'Loading...';
+        document.getElementById('priceChart').style.opacity = '0.5';
+        
+        // Fetch market data
+        const response = await fetch(`${apiUrl}/coins/${cryptoId}/market_chart?vs_currency=usd&days=7`);
+        const data = await response.json();
+        
+        // Process data
+        const prices = data.prices;
+        const timestamps = prices.map(item => new Date(item[0]).toLocaleDateString());
+        const values = prices.map(item => item[1]);
+        
+        // Update chart
+        updateChart(timestamps, values, cryptoIds[cryptoId]);
+        
+        // Update current price
+        const currentPrice = values[values.length - 1].toFixed(2);
+        document.getElementById('currentPrice').textContent = `$${currentPrice}`;
+        
+        // Update last updated time
+        document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
+        document.getElementById('priceChart').style.opacity = '1';
+        
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        document.getElementById('currentPrice').textContent = 'Error loading data';
+        document.getElementById('priceChart').style.opacity = '1';
+      }
+    }
+
+    // Update chart with new data
+    function updateChart(labels, data, symbol) {
+      chart.data.labels = labels;
+      chart.data.datasets[0].data = data;
+      chart.data.datasets[0].label = `${symbol} Price (USD)`;
+      chart.update();
+    }
+
+    // Initialize on page load
+    window.onload = function() {
+      initChart();
+      fetchData('bitcoin'); // Load Bitcoin data by default
+    };
+  </script>
+</body>
+</html>
